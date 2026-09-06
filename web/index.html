@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NLP Support Triage Lab</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Explainable ticket routing</p>
+        <h1>NLP Support Triage Lab</h1>
+      </div>
+      <button id="themeToggle" class="icon-button" type="button" aria-label="Toggle theme" title="Toggle theme">
+        <span id="themeIcon">L</span>
+      </button>
+    </header>
+
+    <main>
+      <section id="homeView" class="view active">
+        <div class="hero">
+          <div class="hero-copy">
+            <p class="eyebrow">Corpus-grounded NLP demo</p>
+            <h2>Route support tickets with retrieval, rules, and transparent evidence.</h2>
+            <p>
+              This lab uses local support documents, hybrid retrieval, pretrained reranking,
+              and escalation rules so each result can be inspected.
+            </p>
+          </div>
+          <div class="guidelines">
+            <div>
+              <span class="metric">3</span>
+              <span>support domains</span>
+            </div>
+            <div>
+              <span class="metric">2</span>
+              <span>pretrained rankers</span>
+            </div>
+            <div>
+              <span class="metric">3</span>
+              <span>ranked resources</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="action-grid">
+          <button class="action-tile" data-nav="datasetView" type="button">
+            <span>Check Existing Dataset</span>
+            <small>View ticket status, company, request type, and summary statistics.</small>
+          </button>
+          <button class="action-tile primary" data-nav="queryView" type="button">
+            <span>Enter Your Query</span>
+            <small>Submit a fresh ticket and inspect the recommendation ranking path.</small>
+          </button>
+        </div>
+      </section>
+
+      <section id="datasetView" class="view">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Existing dataset</p>
+            <h2>Ticket Status Board</h2>
+          </div>
+          <button class="secondary-button" data-nav="homeView" type="button">Home</button>
+        </div>
+        <div id="datasetStats" class="stats-grid"></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Company</th>
+                <th>Subject</th>
+                <th>Status</th>
+                <th>Area</th>
+                <th>Type</th>
+                <th>Score</th>
+              </tr>
+            </thead>
+            <tbody id="datasetRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="queryView" class="view">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">New ticket</p>
+            <h2>Interactive Triage</h2>
+          </div>
+          <button class="secondary-button" data-nav="homeView" type="button">Home</button>
+        </div>
+
+        <div class="company-picker" role="tablist" aria-label="Company">
+          <button class="company-card hackerrank selected" data-company="HackerRank" type="button">
+            <span>HackerRank</span>
+            <small>Assessments, candidates, reports</small>
+          </button>
+          <button class="company-card claude" data-company="Claude" type="button">
+            <span>Claude</span>
+            <small>Accounts, privacy, conversations</small>
+          </button>
+          <button class="company-card visa" data-company="Visa" type="button">
+            <span>Visa</span>
+            <small>Cards, merchants, travel support</small>
+          </button>
+        </div>
+
+        <div class="workspace">
+          <form id="ticketForm" class="ticket-form">
+            <label>
+              Subject
+              <input id="subjectInput" name="subject" type="text" placeholder="Short ticket subject" />
+            </label>
+            <label>
+              Ticket / Query
+              <textarea id="issueInput" name="issue" rows="8" placeholder="Paste or type the user issue here" required></textarea>
+            </label>
+            <button class="submit-button" type="submit">Run Triage</button>
+          </form>
+
+          <aside id="resultPanel" class="result-panel empty">
+            <p class="eyebrow">Recommendation output</p>
+            <h3>No ticket analyzed yet</h3>
+            <p>Choose a company, enter a ticket, and run triage.</p>
+          </aside>
+        </div>
+
+        <div class="history-block">
+          <div class="section-head compact">
+            <div>
+              <p class="eyebrow">Session history</p>
+              <h2>New Tickets</h2>
+            </div>
+            <button id="clearHistory" class="secondary-button" type="button">Clear</button>
+          </div>
+          <div id="historyList" class="history-list"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
