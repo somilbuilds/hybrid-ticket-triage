@@ -22,7 +22,7 @@
         <div class="hero">
           <div class="hero-copy">
             <p class="eyebrow">Corpus-grounded NLP demo</p>
-            <h2>Route support tickets with retrieval, rules, and transparent evidence.</h2>
+            <h2>Route HackerRank support tickets with retrieval, rules, and transparent evidence.</h2>
             <p>
               This lab uses local support documents, hybrid retrieval, pretrained reranking,
               and escalation rules so each result can be inspected.
@@ -30,8 +30,8 @@
           </div>
           <div class="guidelines">
             <div>
-              <span class="metric">3</span>
-              <span>support domains</span>
+              <span class="metric">1</span>
+              <span>focused support domain</span>
             </div>
             <div>
               <span class="metric">2</span>
@@ -47,7 +47,7 @@
         <div class="action-grid">
           <button class="action-tile" data-nav="datasetView" type="button">
             <span>Check Existing Dataset</span>
-            <small>View ticket status, company, request type, and summary statistics.</small>
+            <small>View ticket status, domain, request type, and summary statistics.</small>
           </button>
           <button class="action-tile primary" data-nav="queryView" type="button">
             <span>Enter Your Query</span>
@@ -70,7 +70,7 @@
             <thead>
               <tr>
                 <th>ID</th>
-                <th>Company</th>
+                <th>Domain</th>
                 <th>Subject</th>
                 <th>Status</th>
                 <th>Area</th>
@@ -92,19 +92,9 @@
           <button class="secondary-button" data-nav="homeView" type="button">Home</button>
         </div>
 
-        <div class="company-picker" role="tablist" aria-label="Company">
-          <button class="company-card hackerrank selected" data-company="HackerRank" type="button">
-            <span>HackerRank</span>
-            <small>Assessments, candidates, reports</small>
-          </button>
-          <button class="company-card claude" data-company="Claude" type="button">
-            <span>Claude</span>
-            <small>Accounts, privacy, conversations</small>
-          </button>
-          <button class="company-card visa" data-company="Visa" type="button">
-            <span>Visa</span>
-            <small>Cards, merchants, travel support</small>
-          </button>
+        <div class="domain-banner">
+          <strong>HackerRank domain</strong>
+          <span>Corpus labels come from the HackerRank support taxonomy: screen, integrations, settings, library, interviews, community, skillup, general-help, and other.</span>
         </div>
 
         <div class="workspace">
@@ -123,7 +113,7 @@
           <aside id="resultPanel" class="result-panel empty">
             <p class="eyebrow">Recommendation output</p>
             <h3>No ticket analyzed yet</h3>
-            <p>Choose a company, enter a ticket, and run triage.</p>
+            <p>Enter a HackerRank support ticket and run triage.</p>
           </aside>
         </div>
 

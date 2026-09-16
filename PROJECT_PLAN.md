@@ -1,85 +1,53 @@
-# NLP Support Triage Web App - Project Plan
+# Project Plan
 
 ## Goal
 
-Turn the old HackerRank Orchestrate CLI triage agent into a local UI-based NLP lab application. The app should demonstrate support-ticket triage with an explainable ML/NLP pipeline, not just produce a CSV.
+Complete the migration from a hackathon CLI triage agent into a single-domain HackerRank NLP lab web app. The app should be useful for demonstrating retrieval, ranking, classification, escalation, and explainability on a laptop.
 
-## Current Useful Core
+## Current Architecture
 
-Keep the Python triage engine in `code/`:
+- Active domain: HackerRank only.
+- Active corpus: `data/hackerrank/`.
+- Archived corpora: `data_archive/claude/` and `data_archive/visa/`.
+- Backend: FastAPI in `app.py`.
+- Frontend: static files in `web/`.
+- Engine: Python modules in `code/`.
 
-- `agent.py`: orchestrates ticket triage.
-- `corpus.py`: builds hybrid lexical + semantic retrieval over markdown support docs.
-- `classifier.py`: infers company, request type, and product area.
-- `router.py`: decides reply vs escalation.
-- ranked recommendations replace generated support responses.
+## Retrieval And Response
 
-The current logic is lightweight enough for a laptop. It does not do training or fine-tuning. It uses deterministic lexical scoring, pretrained sentence embeddings, pretrained reranking, and rules, which is appropriate for a lab demo because students can inspect the full decision path.
+- `code/corpus.py` builds a transparent in-memory index.
+- Lexical retrieval uses TF-IDF cosine scoring.
+- Semantic retrieval uses `sentence-transformers/all-MiniLM-L6-v2`.
+- Final fused score uses `alpha * lexical_norm + (1 - alpha) * semantic`.
+- Top fused candidates are reranked with `cross-encoder/ms-marco-MiniLM-L-6-v2`.
+- Output is ranked recommendations, not generated support prose.
+- `code/explain.py` creates an extractive response by selecting source-document sentences from the top recommendation.
 
-## Desired Product
+## Classification And Routing
 
-Build a website with:
+- Request type comes from rules in `code/classifier.py`.
+- Product area comes from `models/area_clf.joblib` through `code/area_model.py`, with evidence fallback.
+- Routing in `code/router.py` escalates on low retrieval score, ambiguous top results, risk terms, privileged/manual actions, and critical outage signals.
+- Decision trace is returned through the API for the lab UI.
 
-1. Home page
-   - App name.
-   - Short guidelines.
-   - Light/dark mode.
-   - Two main actions:
-     - Check existing dataset and status.
-     - Enter your query/ticket.
+## Web Requirements
 
-2. Existing dataset view
-   - Show tickets in a clean table/card layout.
-   - Include company, subject, issue preview, status, product area, and request type.
-   - Show summary stats: total tickets, replied vs escalated, company distribution, request-type distribution.
+- Home page with app name, basic guidance, light/dark mode, and two actions.
+- Dataset board with existing ticket predictions and summary stats.
+- New-ticket form for HackerRank support tickets.
+- Result panel with status, product area, request type, confidence, extractive response, top-3 resources, scores, matched keywords, and decision trace.
+- Session history in local storage only.
 
-3. New ticket triage view
-   - Let user choose HackerRank, Claude, or Visa.
-   - Each company should have its own accent color and visual treatment.
-   - User enters subject and issue.
-   - Backend runs the existing triage engine.
-   - UI shows prediction, recommended resources, confidence, retrieval scores, and routing details.
-   - Add the result to local session history, not to the original dataset.
+## Evaluation
 
-4. History view
-   - Show only user-entered tickets from the web app session/storage.
-   - Do not mutate the original hackathon CSV files.
+- `eval/build_datasets.py` builds retrieval and classification datasets from the HackerRank corpus.
+- `eval/eval_classifier.py` compares keyword rules, TF-IDF logistic regression, and MiniLM logistic regression, then persists the best trainable classifier.
+- `eval/eval_retrieval.py` compares lexical, semantic, hybrid alpha sweep, and reranked retrieval.
+- Keep retrieval eval CPU-friendly; use `--limit 20` for quick smoke runs and omit the limit for full runs.
 
-## Implementation Plan
+## Cleanup Policy
 
-- Use FastAPI for the backend.
-- Serve a static frontend from `web/`.
-- Add API endpoints:
-  - `GET /api/health`
-  - `GET /api/dataset`
-  - `POST /api/triage`
-  - `GET /api/corpus-stats`
-- Keep the CLI runnable for compatibility, but the web app becomes the main interface.
-- Improve `SupportTriageAgent` with a detailed prediction method so the frontend can display evidence and scores.
-
-## Cleanup Plan
-
-Remove hackathon-only files from the active project root:
-
-- `AGENTS.md`
-- `CLAUDE.md`
-- `problem_statement.md`
-- `evalutation_criteria.md`
-- `code-zip.zip`
-- root `log.txt`
-- macOS extraction folder `support_tickets/__MACOSX`
-- old ignored `support_tickets_github/` trial outputs
-
-Keep:
-
-- `code/`
-- `data/`
-- `support_tickets/support_tickets/*.csv`
-- `.env` / `.gitignore`
-- new web app files and docs
-
-## Notes For Future Work
-
-- If accuracy needs improvement, first tune rules, retrieval thresholds, and reranking blend using the sample tickets. Do not jump to fine-tuning.
-- A possible later upgrade is evaluating alternative embedding or reranker models, but keep the system inference-only for the lab.
-- Keep secrets in `.env`; never hardcode API keys.
+- Do not restore old hackathon `AGENTS.md`, logging workflows, or onboarding files.
+- Do not add Gemini/Groq/LLM polish paths.
+- Do not mutate original CSV datasets when users submit web tickets.
+- Keep pretrained model caches out of git; commit source code, docs, eval scripts/results, archived corpus moves, and the small persisted classifier.

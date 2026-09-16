@@ -1,5 +1,15 @@
 from __future__ import annotations
 
+"""Hybrid retrieval for the single-domain HackerRank support corpus.
+
+The corpus is small enough that a transparent in-memory implementation is more
+useful than a vector database. The index combines lexical TF-IDF, MiniLM cosine
+similarity, and optional cross-encoder reranking. Evaluation can pass
+`heldout_text_by_path` so pseudo-query text is removed from its source document
+before indexing; otherwise title-query evaluation would collapse into exact
+string lookup.
+"""
+
 import hashlib
 import json
 import math
@@ -13,7 +23,8 @@ from models import EvidenceChunk
 TOKEN_RE = re.compile(r"[a-zA-Z0-9_']+")
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 RERANK_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
-CACHE_VERSION = 1
+CACHE_VERSION = 2
+MINOR_AREAS = {"engage", "chakra", "uncategorized"}
 
 STOPWORDS = {
     "a",
@@ -50,12 +61,21 @@ STOPWORDS = {
 }
 
 
+def normalize_product_area(area: str) -> str:
+    clean = area.strip().lower()
+    return "other" if clean in MINOR_AREAS else clean
+
+
 def tokenize(text: str) -> list[str]:
     return [
         token.lower()
         for token in TOKEN_RE.findall(text)
         if token.lower() not in STOPWORDS
     ]
+
+
+def first_tokens(text: str, limit: int) -> str:
+    return " ".join(TOKEN_RE.findall(text)[:limit])
 
 
 class CorpusIndex:
@@ -66,12 +86,13 @@ class CorpusIndex:
         cache_dir: Path | None = None,
         use_embeddings: bool = True,
         use_reranker: bool = True,
+        heldout_text_by_path: dict[str, list[str]] | None = None,
     ) -> None:
-        self._data_dir = data_dir
         self._alpha = min(max(alpha, 0.0), 1.0)
         self._cache_dir = cache_dir or data_dir / ".cache"
         self._use_embeddings = use_embeddings
         self._use_reranker = use_reranker
+        self._heldout_text_by_path = heldout_text_by_path or {}
         self._docs: list[dict[str, Any]] = []
         self._idf: dict[str, float] = {}
         self._embeddings = None
@@ -83,6 +104,13 @@ class CorpusIndex:
     def document_count(self) -> int:
         return len(self._docs)
 
+    @property
+    def documents(self) -> list[dict[str, Any]]:
+        return self._docs
+
+    def set_alpha(self, alpha: float) -> None:
+        self._alpha = min(max(alpha, 0.0), 1.0)
+
     def _build(self, data_dir: Path) -> None:
         doc_freq: defaultdict[str, int] = defaultdict(int)
 
@@ -90,15 +118,21 @@ class CorpusIndex:
             rel = md_path.relative_to(data_dir)
             if rel.parts and rel.parts[0] == ".cache":
                 continue
-            company = rel.parts[0].lower() if rel.parts else "unknown"
+            if rel.parts and rel.parts[0].lower() != "hackerrank":
+                continue
+            if len(rel.parts) < 3:
+                continue
+            product_area = normalize_product_area(rel.parts[1]) if len(rel.parts) > 1 else "other"
             try:
-                text = md_path.read_text(encoding="utf-8", errors="ignore")
+                raw_text = md_path.read_text(encoding="utf-8", errors="ignore")
             except OSError:
                 continue
 
-            title = self._extract_title(md_path.stem, text)
-            content = self._squash_whitespace(text)
-            tokens = tokenize(f"{title}\n{content}")
+            title = self._extract_title(md_path.stem, raw_text)
+            content = self._squash_whitespace(raw_text)
+            source_path = str(rel).replace("\\", "/")
+            index_title, index_content = self._apply_heldout_text(source_path, title, content)
+            tokens = tokenize(f"{index_title}\n{index_content}")
             if not tokens:
                 continue
 
@@ -108,10 +142,13 @@ class CorpusIndex:
 
             self._docs.append(
                 {
-                    "company": company,
-                    "source_path": str(rel).replace("\\", "/"),
+                    "company": "hackerrank",
+                    "product_area": product_area,
+                    "source_path": source_path,
                     "title": title,
                     "content": content,
+                    "index_title": index_title,
+                    "index_content": index_content,
                     "tf": tf,
                     "norm": 0.0,
                     "mtime_ns": md_path.stat().st_mtime_ns,
@@ -149,13 +186,23 @@ class CorpusIndex:
             parts = text.split("---", 2)
             if len(parts) == 3:
                 text = parts[2]
-        lines = [line.rstrip() for line in text.splitlines()]
-        return "\n".join(lines)
+        return "\n".join(line.rstrip() for line in text.splitlines())
+
+    def _apply_heldout_text(self, source_path: str, title: str, content: str) -> tuple[str, str]:
+        index_title = title
+        index_content = content
+        for heldout in self._heldout_text_by_path.get(source_path, []):
+            clean = heldout.strip()
+            if clean:
+                index_title = index_title.replace(clean, " ")
+                index_content = index_content.replace(clean, " ")
+        return index_title, index_content
 
     def _corpus_signature(self) -> str:
         payload = {
             "version": CACHE_VERSION,
             "model": EMBEDDING_MODEL,
+            "heldout": self._heldout_text_by_path,
             "docs": [
                 [doc["source_path"], doc["mtime_ns"], doc["size"]]
                 for doc in self._docs
@@ -176,7 +223,7 @@ class CorpusIndex:
 
         self._embedder = SentenceTransformer(EMBEDDING_MODEL, device="cpu")
         texts = [
-            f"{doc['title']}\n{doc['content'][:1800]}"
+            f"{doc['index_title']}\n{doc['index_content'][:1800]}"
             for doc in self._docs
         ]
         embeddings = self._embedder.encode(
@@ -203,56 +250,58 @@ class CorpusIndex:
             self._reranker = CrossEncoder(RERANK_MODEL, device="cpu")
         return self._reranker
 
-    def lexical_search(
-        self,
-        query: str,
-        top_k: int,
-        company_hint: str | None = None,
-    ) -> list[EvidenceChunk]:
-        candidates = self._lexical_candidates(query, company_hint)
+    def lexical_search(self, query: str, top_k: int) -> list[EvidenceChunk]:
+        candidates = self._lexical_candidates(query)
         candidates.sort(key=lambda item: item["lexical_score"], reverse=True)
         return [
             self._to_chunk(item, query_tokens=tokenize(query), score_key="lexical_score")
             for item in candidates[:top_k]
         ]
 
-    def search(
-        self,
-        query: str,
-        top_k: int,
-        company_hint: str | None = None,
-        rerank_pool: int = 10,
-    ) -> list[EvidenceChunk]:
+    def semantic_search(self, query: str, top_k: int) -> list[EvidenceChunk]:
+        semantic_scores = self._semantic_scores(query)
+        if semantic_scores is None:
+            return []
+        candidates = []
+        for doc_index, doc in enumerate(self._docs):
+            score = max(0.0, float(semantic_scores[doc_index]))
+            if score <= 0:
+                continue
+            candidates.append(
+                {
+                    "doc_index": doc_index,
+                    "doc": doc,
+                    "lexical_score": 0.0,
+                    "lexical_norm": 0.0,
+                    "semantic_score": score,
+                    "final_score": score,
+                    "rerank_score": 0.0,
+                }
+            )
+        candidates.sort(key=lambda item: item["semantic_score"], reverse=True)
+        return [self._to_chunk(item, tokenize(query)) for item in candidates[:top_k]]
+
+    def search(self, query: str, top_k: int, rerank_pool: int = 10) -> list[EvidenceChunk]:
         q_tokens = tokenize(query)
         if not q_tokens:
             return []
 
         lexical_by_index = {
             item["doc_index"]: item["lexical_score"]
-            for item in self._lexical_candidates(query, company_hint)
+            for item in self._lexical_candidates(query)
         }
         semantic_scores = self._semantic_scores(query)
         if semantic_scores is None and not lexical_by_index:
             return []
 
-        candidate_indexes = self._candidate_indexes(company_hint)
-        if semantic_scores is None:
-            candidate_indexes = [
-                index for index in candidate_indexes if index in lexical_by_index
-            ]
         max_lexical = max(lexical_by_index.values(), default=1.0) or 1.0
-
         fused = []
-        for doc_index in candidate_indexes:
-            doc = self._docs[doc_index]
+        for doc_index, doc in enumerate(self._docs):
             lexical_score = lexical_by_index.get(doc_index, 0.0)
             semantic = float(semantic_scores[doc_index]) if semantic_scores is not None else 0.0
             semantic = max(0.0, semantic)
             lexical_norm = lexical_score / max_lexical
-            final_score = (
-                (self._alpha * lexical_norm)
-                + ((1.0 - self._alpha) * semantic)
-            )
+            final_score = (self._alpha * lexical_norm) + ((1.0 - self._alpha) * semantic)
             if final_score <= 0:
                 continue
             fused.append(
@@ -283,19 +332,7 @@ class CorpusIndex:
 
         return [self._to_chunk(item, q_tokens) for item in pool[:top_k]]
 
-    def _candidate_indexes(self, company_hint: str | None) -> list[int]:
-        indexes = []
-        for index, doc in enumerate(self._docs):
-            if company_hint and company_hint != "none" and doc["company"] != company_hint:
-                continue
-            indexes.append(index)
-        return indexes
-
-    def _lexical_candidates(
-        self,
-        query: str,
-        company_hint: str | None,
-    ) -> list[dict[str, Any]]:
+    def _lexical_candidates(self, query: str) -> list[dict[str, Any]]:
         q_tokens = tokenize(query)
         if not q_tokens:
             return []
@@ -309,25 +346,32 @@ class CorpusIndex:
 
         candidates = []
         for index, doc in enumerate(self._docs):
-            if company_hint and company_hint != "none" and doc["company"] != company_hint:
-                continue
-
             dot = 0.0
+            token_contrib: dict[str, float] = {}
             for token, q_count in q_tf.items():
                 d_count = doc["tf"].get(token, 0)
                 if d_count == 0:
                     continue
                 idf = self._idf.get(token, 1.0)
-                dot += (q_count * idf) * (d_count * idf)
+                contrib = (q_count * idf) * (d_count * idf)
+                dot += contrib
+                token_contrib[token] = contrib
             if dot <= 0:
                 continue
 
             lexical_score = dot / (q_norm * doc["norm"])
+            total = sum(token_contrib.values()) or 1.0
             candidates.append(
                 {
                     "doc_index": index,
                     "doc": doc,
                     "lexical_score": lexical_score,
+                    "token_contrib": {
+                        token: value / total
+                        for token, value in sorted(
+                            token_contrib.items(), key=lambda item: item[1], reverse=True
+                        )
+                    },
                 }
             )
         return candidates
@@ -363,6 +407,7 @@ class CorpusIndex:
         explanation = self._explain_match(matched, lexical, semantic, rerank)
         return EvidenceChunk(
             company=doc["company"],
+            product_area=doc["product_area"],
             source_path=doc["source_path"],
             title=doc["title"],
             content=doc["content"][:900],
@@ -372,6 +417,7 @@ class CorpusIndex:
             rerank_score=rerank,
             matched_keywords=matched,
             match_explanation=explanation,
+            lexical_attribution=item.get("token_contrib", {}),
         )
 
     @staticmethod
@@ -384,7 +430,7 @@ class CorpusIndex:
         keyword_text = ", ".join(matched_keywords[:4]) if matched_keywords else "semantic similarity"
         if rerank_score:
             return (
-                f"Ranked highly after cross-encoder reranking; matched {keyword_text} "
+                f"Ranked after cross-encoder reranking; matched {keyword_text} "
                 f"with lexical={lexical_score:.2f} and semantic={semantic_score:.2f}."
             )
         return (

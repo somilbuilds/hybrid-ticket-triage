@@ -1,7 +1,11 @@
 from __future__ import annotations
 
-from models import EvidenceChunk, Ticket
+"""Routing rules for deciding whether a ticket needs human review."""
+
+import re
+
 from corpus import tokenize
+from models import EvidenceChunk, Ticket
 
 HIGH_RISK_TERMS = {
     "fraud",
@@ -12,12 +16,11 @@ HIGH_RISK_TERMS = {
     "workspace owner",
 }
 
-MANDATORY_ESCALATE_TERMS = {
-    "increase my score",
-    "ban the seller",
-    "restore my access immediately",
-    "review my answers",
-}
+PRIVILEGED_ACTION_PATTERNS = [
+    re.compile(r"\b(change|alter|increase|raise|fix|modify|update)\b.{0,50}\b(score|grade|result|outcome)\b", re.I),
+    re.compile(r"\b(restore|unlock|grant|remove|delete|ban)\b.{0,50}\b(account|access|user|candidate)\b", re.I),
+    re.compile(r"\b(review|override|reevaluate|re-evaluate)\b.{0,50}\b(answer|submission|score|test)\b", re.I),
+]
 
 
 def _confidence_tag(evidence: list[EvidenceChunk]) -> str:
@@ -38,19 +41,6 @@ def assess_routing(
     ambiguity_margin: float = 0.03,
 ) -> tuple[bool, str, str]:
     text = ticket.combined_text.lower()
-    is_visa = (ticket.company or "").strip().lower() == "visa" or "visa" in text
-    has_lost_card_flow = any(
-        term in text
-        for term in (
-            "lost card",
-            "stolen card",
-            "traveller",
-            "traveler",
-            "travel cheque",
-            "traveller's cheque",
-            "traveler's cheque",
-        )
-    )
     confidence = _confidence_tag(evidence)
 
     if request_type == "invalid":
@@ -59,7 +49,7 @@ def assess_routing(
     if len(tokenize(ticket.combined_text)) < 3:
         return True, "too_little_issue_detail", confidence
 
-    if any(term in text for term in MANDATORY_ESCALATE_TERMS):
+    if any(pattern.search(text) for pattern in PRIVILEGED_ACTION_PATTERNS):
         return True, "manual_or_privileged_action_required", confidence
 
     if any(term in text for term in HIGH_RISK_TERMS):
@@ -74,8 +64,5 @@ def assess_routing(
         return True, "low_hybrid_retrieval_score", confidence
     if len(evidence) > 1 and abs(evidence[0].score - evidence[1].score) < ambiguity_margin:
         return True, "ambiguous_top_recommendations", confidence
-
-    if is_visa and has_lost_card_flow:
-        return False, "visa_loss_or_travel_flow_supported", confidence
 
     return False, "clear_ranked_recommendation", confidence

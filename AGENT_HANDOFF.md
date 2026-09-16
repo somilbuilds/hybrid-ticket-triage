@@ -1,84 +1,59 @@
 # Agent Handoff
 
-## Current Direction
+## User Intent
 
-The user wants this repository converted from an old CLI hackathon submission into a UI-based NLP lab software project.
+The user wants the old CLI hackathon support-triage project turned into a polished webpage/GUI for an NLP lab. The current target is no longer three-domain triage. It is a focused HackerRank support-ticket triage app with explainable retrieval and recommendations.
 
-Do not continue the old hackathon onboarding/logging workflow. The user explicitly asked to remove the unwanted hackathon `AGENTS.md` behavior and said there should be no logging now.
+## Do Not Reintroduce
 
-## What To Build
+- Old hackathon `AGENTS.md` behavior.
+- Logging/onboarding workflows.
+- Gemini, Groq, or other LLM prose-polish response generation.
+- Claude/Visa as active runtime domains.
+- Writes to the original ticket CSVs from the web UI.
 
-Build a local website for the existing support triage engine:
+## Current System
 
-- Home page with app name, basic guidelines, dark/light mode, and two main buttons.
-- Dataset view showing existing tickets and their predicted status/company/product area neatly.
-- Query view where the user selects one of three companies:
-  - HackerRank
-  - Claude
-  - Visa
-- Each company option should have a distinct accent color and UI treatment.
-- User enters a subject and issue.
-- Backend runs the existing Python triage pipeline.
-- UI displays:
-  - replied/escalated status
-  - product area
-  - request type
-  - top-3 recommended resources
-  - justification
-  - confidence/routing information
-  - lexical, semantic, fused, and rerank scores
-  - matched keywords and one-line match explanations
-  - useful NLP/ML stats
-- Add submitted tickets to web-app history only. Do not modify original CSV datasets.
+- Active docs: `data/hackerrank/`.
+- Archived docs: `data_archive/claude/`, `data_archive/visa/`.
+- FastAPI backend: `app.py`.
+- Static UI: `web/index.html`, `web/styles.css`, `web/app.js`.
+- Core engine: `code/agent.py`.
+- Hybrid retriever: `code/corpus.py`.
+- Product-area model loader: `code/area_model.py`.
+- Decision/extractive explanation helpers: `code/explain.py`.
+- Routing rules: `code/router.py`.
+- Dataclasses/API serialization: `code/models.py`.
 
-## Recommended Architecture
+## Current Pipeline
 
-- Backend: FastAPI in `app.py`.
-- Frontend: static HTML/CSS/JS in `web/`.
-- Existing engine: reuse `code/SupportTriageAgent`.
-- Add a detailed prediction method to `SupportTriageAgent` instead of duplicating pipeline logic in the API.
+```text
+ticket text
+  -> request-type rules
+  -> product-area classifier
+  -> TF-IDF lexical retrieval
+  -> MiniLM semantic retrieval
+  -> alpha fusion
+  -> cross-encoder rerank
+  -> escalation/routing rules
+  -> extractive source response + top-3 resource recommendations
+```
 
-## Important Files
+## Evaluation Commands
 
-- `code/agent.py`: main pipeline.
-- `code/corpus.py`: TF-IDF retriever.
-- `code/classifier.py`: request/company/product rules.
-- `code/router.py`: escalation decision logic.
-- `code/models.py`: dataclasses.
-- `support_tickets/support_tickets/sample_support_tickets.csv`: labeled sample data.
-- `support_tickets/support_tickets/support_tickets.csv`: unlabeled/original dataset.
+```bash
+python eval/build_datasets.py
+python eval/eval_classifier.py
+python eval/eval_retrieval.py --limit 20
+```
 
-## Cleanup
+The full retrieval evaluation can be run by omitting `--limit`, but it is slower on CPU because the cross-encoder reranks many query/resource pairs.
 
-The active project should not keep old hackathon management files. Remove old root artifacts after the new plan files exist:
-
-- `AGENTS.md`
-- `CLAUDE.md`
-- `problem_statement.md`
-- `evalutation_criteria.md`
-- `code-zip.zip`
-- `log.txt`
-- `support_tickets/__MACOSX`
-- `support_tickets_github/`
-
-## Accuracy And Training
-
-Do not train or fine-tune a model unless the user explicitly asks. The current method is hybrid lexical + pretrained MiniLM embeddings + pretrained cross-encoder reranking plus rules, which is laptop-friendly and explainable for an NLP lab.
-
-If improving accuracy:
-
-1. Run sample tickets.
-2. Compare predicted columns with expected columns.
-3. Adjust retrieval thresholds, product-area rules, and escalation rules.
-4. Keep the app explainable.
-
-## Final Expected State
-
-The user should be able to run:
+## Expected Run Command
 
 ```bash
 pip install -r requirements.txt
 uvicorn app:app --reload
 ```
 
-Then open the local URL and use the web dashboard.
+Then open `http://127.0.0.1:8000`.

@@ -1,21 +1,20 @@
-# NLP Support Triage Lab
+# HackerRank NLP Support Triage Lab
 
-Local web application for explainable support-ticket triage across HackerRank, Claude, and Visa support domains.
-
-The project began as a CLI hackathon agent. It is now organized as a lab-friendly web app: students can enter support tickets, inspect ranking decisions, view recommended resources, and compare reply/escalation behavior.
+Local web software for explainable HackerRank support-ticket triage. The project started as a CLI hackathon submission; it is now a single-domain, UI-first NLP lab app.
 
 ## What It Does
 
-- Reads a local markdown support corpus from `data/`.
-- Uses hybrid retrieval: lexical TF-IDF/BM25-style scoring plus MiniLM sentence embeddings.
-- Re-ranks the top fused candidates with a pretrained cross-encoder.
-- Classifies request type: `product_issue`, `feature_request`, `bug`, or `invalid`.
-- Routes product area, company, confidence, and reply/escalation status.
-- Returns top-3 recommended support resources instead of generating prose answers.
-- Displays NLP/ML details in the browser: lexical score, semantic score, rerank score, final score, matched keywords, confidence, and routing reason.
-- Keeps new ticket history in browser local storage only. Original CSV datasets are not modified.
+- Reads HackerRank support documentation from `data/hackerrank/`.
+- Archives older Claude/Visa corpora under `data_archive/` so they do not affect inference.
+- Uses hybrid retrieval: TF-IDF lexical similarity plus MiniLM sentence embeddings.
+- Fuses scores with configurable alpha, then re-ranks the top candidates with `cross-encoder/ms-marco-MiniLM-L-6-v2`.
+- Returns top-3 recommended resources with title, path, score, matched keywords, and a one-line match reason.
+- Produces an extractive source response from the top support article; it does not generate fake LLM prose.
+- Classifies request type and product area, then decides `replied` vs `escalated`.
+- Shows decision trace details in the browser: confidence, routing reason, score gap, area probability, and lexical token attribution.
+- Stores manually submitted ticket history only in browser local storage. Original CSV files are not modified.
 
-## Run The Web App
+## Run
 
 ```bash
 pip install -r requirements.txt
@@ -28,44 +27,68 @@ Open:
 http://127.0.0.1:8000
 ```
 
-## Web Pages
+The first run may download pretrained `sentence-transformers` models. Corpus embeddings are cached in `data/.cache/`, so server restarts do not rebuild embeddings unless the corpus changes.
 
-- **Home**: app overview, guidelines, dark/light mode, and main navigation.
-- **Check Existing Dataset**: runs recommendation over the existing CSV and shows ticket status, company, product area, request type, confidence, and summary statistics.
-- **Enter Your Query**: choose HackerRank, Claude, or Visa; enter a subject and ticket; inspect prediction, recommendations, justification, scores, and model statistics.
-- **Session History**: stores manually entered web tickets in local browser storage only.
+## Web Views
 
-## Model Approach
+- **Home**: project name, short guidance, light/dark mode, and two main actions.
+- **Check Existing Dataset**: predicts status for the existing ticket CSV and shows domain, product area, request type, confidence, top score, and summary cards.
+- **Enter Your Query**: accepts a new HackerRank ticket, returns an extractive source response, ranked resources, and decision trace.
+- **Session History**: keeps only new web submissions in local browser storage.
 
-This app intentionally avoids training or fine-tuning. The pipeline is:
+## Pipeline
 
 ```text
-Ticket text
-  -> company and request type rules
-  -> lexical retrieval over local markdown corpus
-  -> MiniLM sentence-embedding retrieval
-  -> score fusion: alpha * lexical + (1-alpha) * semantic
-  -> cross-encoder reranking of top fused candidates
-  -> evidence-weighted product area routing
-  -> escalation rules
-  -> top-3 ranked resource recommendations
+ticket subject + issue
+  -> request-type rules
+  -> product-area classifier trained from HackerRank corpus labels
+  -> lexical TF-IDF retrieval
+  -> MiniLM cosine similarity retrieval
+  -> fused score: alpha * lexical_norm + (1 - alpha) * semantic
+  -> cross-encoder rerank over top fused candidates
+  -> escalation rules: low score, ambiguity, risk terms, privileged/manual actions
+  -> top-3 resource recommendations + extractive source response
 ```
 
-This is laptop-friendly and explainable, which is useful for an NLP lab. The first run downloads pretrained models and caches corpus embeddings in `data/.cache/`; later restarts reuse the cache unless the corpus changes.
+No fine-tuning is used. The persisted `models/area_clf.joblib` is a lightweight scikit-learn product-area classifier built from local corpus labels for the lab demo.
 
-## Important Folders
+## Evaluation Artifacts
 
-- `app.py`: FastAPI backend.
+Evaluation data and reports live under `eval/`.
+
+- `eval/datasets/retrieval.jsonl`: pseudo-query retrieval dataset.
+- `eval/datasets/classification.csv`: product-area classification dataset.
+- `eval/results/retrieval.csv`: retrieval smoke benchmark. In the current 20-query smoke run, `hybrid_best_rerank` reached recall@1 `0.55`, recall@3 `0.65`, and nDCG@10 `0.6447`.
+- `eval/results/classification.csv`: 5-fold classifier report. Current best model is TF-IDF logistic regression with weighted F1 about `0.86`.
+- `eval/results/*.png`: alpha sweep and confusion matrix plots.
+
+Run the evals:
+
+```bash
+python eval/build_datasets.py
+python eval/eval_classifier.py
+python eval/eval_retrieval.py --limit 20
+python eval/compare_retrieval.py --limit 10
+```
+
+For a full retrieval sweep, omit `--limit`; it is slower because each query may run cross-encoder reranking on CPU.
+
+## Important Files
+
+- `app.py`: FastAPI server and API endpoints.
 - `web/`: static frontend.
-- `code/`: reusable triage engine.
-- `data/`: local support documentation corpus.
-- `support_tickets/support_tickets/`: CSV datasets.
-- `PROJECT_PLAN.md`: product and implementation plan.
-- `AGENT_HANDOFF.md`: concise handoff for future agents.
+- `code/agent.py`: triage orchestration.
+- `code/corpus.py`: hybrid retrieval and cached embeddings.
+- `code/router.py`: escalation rules.
+- `code/explain.py`: extractive response and decision trace helpers.
+- `code/area_model.py`: runtime product-area classifier loader.
+- `models/area_clf.joblib`: persisted product-area classifier.
+- `data/hackerrank/`: active support corpus.
+- `data_archive/`: archived corpora excluded from inference.
 
 ## CLI Compatibility
 
-The original command-line flow still works:
+The original batch flow still works:
 
 ```bash
 python code/main.py --input support_tickets/support_tickets/support_tickets.csv --output support_tickets/support_tickets/output.csv

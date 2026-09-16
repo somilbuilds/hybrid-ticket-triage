@@ -18,6 +18,7 @@ if str(CODE_DIR) not in sys.path:
     sys.path.insert(0, str(CODE_DIR))
 
 from agent import SupportTriageAgent  # noqa: E402
+from corpus import CorpusIndex  # noqa: E402
 
 load_dotenv(ROOT / ".env")
 
@@ -91,17 +92,15 @@ def health() -> dict[str, Any]:
 
 @app.get("/api/corpus-stats")
 def corpus_stats() -> dict[str, Any]:
-    files = list(DATA_DIR.rglob("*.md"))
-    by_company: dict[str, int] = {}
-    for path in files:
-        try:
-            company = path.relative_to(DATA_DIR).parts[0]
-        except ValueError:
-            company = "unknown"
-        by_company[company] = by_company.get(company, 0) + 1
+    index = CorpusIndex(DATA_DIR, use_embeddings=False, use_reranker=False)
+    by_area: dict[str, int] = {}
+    for doc in index.documents:
+        area = str(doc.get("product_area") or "unknown")
+        by_area[area] = by_area.get(area, 0) + 1
     return {
-        "documents": len(files),
-        "companies": dict(sorted(by_company.items())),
+        "documents": index.document_count,
+        "domain": "hackerrank",
+        "product_areas": dict(sorted(by_area.items())),
     }
 
 

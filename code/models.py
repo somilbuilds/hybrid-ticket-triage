@@ -17,6 +17,7 @@ class Ticket:
 @dataclass(frozen=True)
 class EvidenceChunk:
     company: str
+    product_area: str
     source_path: str
     title: str
     content: str
@@ -26,6 +27,7 @@ class EvidenceChunk:
     rerank_score: float = 0.0
     matched_keywords: list[str] = field(default_factory=list)
     match_explanation: str = ""
+    lexical_attribution: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -58,6 +60,7 @@ class TriageDetails:
     confidence: str
     area_confidence: str
     escalation_reason: str
+    decision_trace: dict = field(default_factory=dict)
 
     def to_api(self) -> dict:
         scores = [chunk.score for chunk in self.evidence]
@@ -78,11 +81,13 @@ class TriageDetails:
                 "top_score": round(scores[0], 4) if scores else 0,
                 "average_score": round(sum(scores) / len(scores), 4) if scores else 0,
                 "evidence_count": len(self.evidence),
+                "decision_trace": self.decision_trace,
             },
             "recommendations": [
                 {
                     "rank": index,
                     "company": chunk.company,
+                    "product_area": chunk.product_area,
                     "source_path": chunk.source_path,
                     "title": chunk.title,
                     "content": chunk.content,
@@ -92,6 +97,7 @@ class TriageDetails:
                     "rerank_score": round(chunk.rerank_score, 4),
                     "matched_keywords": chunk.matched_keywords,
                     "match_explanation": chunk.match_explanation,
+                    "lexical_attribution": chunk.lexical_attribution,
                 }
                 for index, chunk in enumerate(self.evidence[:3], start=1)
             ],
@@ -99,6 +105,7 @@ class TriageDetails:
                 {
                     "rank": index,
                     "company": chunk.company,
+                    "product_area": chunk.product_area,
                     "source_path": chunk.source_path,
                     "title": chunk.title,
                     "content": chunk.content,
@@ -108,6 +115,7 @@ class TriageDetails:
                     "rerank_score": round(chunk.rerank_score, 4),
                     "matched_keywords": chunk.matched_keywords,
                     "match_explanation": chunk.match_explanation,
+                    "lexical_attribution": chunk.lexical_attribution,
                 }
                 for index, chunk in enumerate(self.evidence, start=1)
             ],

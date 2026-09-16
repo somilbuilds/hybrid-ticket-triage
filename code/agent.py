@@ -5,11 +5,11 @@ from pathlib import Path
 
 from classifier import (
     classify_request_type,
-    infer_company,
-    infer_company_from_evidence,
     infer_product_area_from_evidence,
 )
 from corpus import CorpusIndex
+from area_model import predict_area
+from explain import build_decision_trace, extractive_response
 from models import EvidenceChunk, Prediction, Ticket, TriageDetails
 from router import assess_routing
 
@@ -43,35 +43,42 @@ class SupportTriageAgent:
         ticket = Ticket(
             issue=self._pick(row, "issue", "Issue"),
             subject=self._pick(row, "subject", "Subject"),
-            company=self._pick(row, "company", "Company"),
+            company="HackerRank",
         )
-        fallback_company = infer_company(ticket)
         request_type = classify_request_type(ticket)
         queries = self._build_queries(ticket)
 
-        evidence = self._retrieve_evidence(
-            queries=queries,
-            fallback_company=fallback_company,
-        )
+        evidence = self._retrieve_evidence(queries=queries)
 
-        company = infer_company_from_evidence(ticket, evidence, fallback_company)
-        product_area, area_confidence = infer_product_area_from_evidence(
-            ticket=ticket,
-            company=company,
-            evidence=evidence,
-            request_type=request_type,
-        )
+        product_area, area_probability = predict_area(ticket.combined_text)
+        if area_probability <= 0:
+            product_area, area_probability = infer_product_area_from_evidence(
+                evidence=evidence,
+                request_type=request_type,
+            )
         escalated, escalation_reason, confidence = assess_routing(
             ticket=ticket,
             request_type=request_type,
             evidence=evidence,
         )
         status = "escalated" if escalated else "replied"
-        response = self._format_recommendation_summary(evidence)
+        response = (
+            "Escalate to a human reviewer before replying. The ranked resources remain useful as context."
+            if escalated
+            else extractive_response(ticket.combined_text, evidence[0] if evidence else None)
+        )
+        decision_trace = build_decision_trace(
+            request_type=request_type,
+            product_area=product_area,
+            area_probability=area_probability,
+            confidence=confidence,
+            escalation_reason=escalation_reason,
+            evidence=evidence,
+        )
         justification = (
             f"{'Escalated' if escalated else 'Recommended resources'} in {product_area} "
             f"because {escalation_reason}; confidence={confidence}; "
-            f"area_confidence={area_confidence}; top_recommendations={len(evidence)}."
+            f"area_probability={area_probability:.3f}; top_recommendations={len(evidence)}."
         )
 
         prediction = Prediction(
@@ -85,13 +92,14 @@ class SupportTriageAgent:
         return TriageDetails(
             ticket=ticket,
             prediction=prediction,
-            company=company,
-            fallback_company=fallback_company,
+            company="hackerrank",
+            fallback_company="hackerrank",
             queries=queries,
             evidence=evidence,
             confidence=confidence,
-            area_confidence=area_confidence,
+            area_confidence=f"{area_probability:.3f}",
             escalation_reason=escalation_reason,
+            decision_trace=decision_trace,
         )
 
     def _build_queries(self, ticket: Ticket) -> list[str]:
@@ -115,15 +123,11 @@ class SupportTriageAgent:
     def _retrieve_evidence(
         self,
         queries: list[str],
-        fallback_company: str,
     ) -> list[EvidenceChunk]:
         collected: dict[str, EvidenceChunk] = {}
-        company_hint = fallback_company if fallback_company in {"hackerrank", "claude", "visa"} else None
 
         for query in queries:
-            primary = self._index.search(query=query, top_k=self._top_k, company_hint=company_hint)
-            secondary = self._index.search(query=query, top_k=max(2, self._top_k), company_hint=None)
-            for chunk in primary + secondary:
+            for chunk in self._index.search(query=query, top_k=self._top_k):
                 key = chunk.source_path
                 prev = collected.get(key)
                 if prev is None or chunk.score > prev.score:

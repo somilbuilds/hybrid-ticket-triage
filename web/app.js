@@ -5,7 +5,6 @@ const state = {
 
 const views = [...document.querySelectorAll(".view")];
 const navButtons = [...document.querySelectorAll("[data-nav]")];
-const companyButtons = [...document.querySelectorAll("[data-company]")];
 const datasetRows = document.querySelector("#datasetRows");
 const datasetStats = document.querySelector("#datasetStats");
 const form = document.querySelector("#ticketForm");
@@ -118,9 +117,32 @@ function renderRecommendations(recommendations) {
   `;
 }
 
+function renderTrace(trace) {
+  if (!trace) return "";
+  const top = trace.top_resource;
+  const tokens = (trace.top_lexical_attribution || [])
+    .map((item) => `${escapeHtml(item.token)} ${Number(item.weight || 0).toFixed(2)}`)
+    .join(", ");
+  return `
+    <div class="trace-box">
+      <h3>Decision Trace</h3>
+      <div class="result-grid compact-grid">
+        <div class="kv"><span>Rule Type</span><strong>${escapeHtml(titleCase(trace.request_type_rule))}</strong></div>
+        <div class="kv"><span>Area Model</span><strong>${escapeHtml(titleCase(trace.product_area))}</strong></div>
+        <div class="kv"><span>Area Prob.</span><strong>${Number(trace.area_probability || 0).toFixed(3)}</strong></div>
+        <div class="kv"><span>Ambiguity Gap</span><strong>${trace.ambiguity_gap === null || trace.ambiguity_gap === undefined ? "n/a" : Number(trace.ambiguity_gap).toFixed(3)}</strong></div>
+      </div>
+      ${top ? `<p>Top resource: <strong>${escapeHtml(top.title)}</strong> (${escapeHtml(top.path)})</p>` : ""}
+      <p>Top lexical contributions: ${tokens || "semantic/reranker match"}</p>
+      <p>Routing reason: ${escapeHtml(trace.routing_reason)}</p>
+    </div>
+  `;
+}
+
 function renderResult(data) {
   const prediction = data.prediction;
   const analysis = data.analysis;
+  const trace = analysis.decision_trace;
   resultPanel.classList.remove("empty");
   resultPanel.innerHTML = `
     <p class="eyebrow">Recommendation output</p>
@@ -134,8 +156,11 @@ function renderResult(data) {
       <div class="kv"><span>Resource Count</span><strong>${analysis.evidence_count}</strong></div>
     </div>
     <div class="response-box">${escapeHtml(prediction.justification)}</div>
+    <h3 style="margin-top: 18px;">Extractive Source Response</h3>
+    <div class="response-box">${escapeHtml(prediction.response)}</div>
     <h3 style="margin-top: 18px;">Recommended Resources</h3>
     ${renderRecommendations(data.recommendations)}
+    ${renderTrace(trace)}
   `;
 }
 
@@ -171,13 +196,6 @@ function renderHistory() {
 
 navButtons.forEach((button) => {
   button.addEventListener("click", () => showView(button.dataset.nav));
-});
-
-companyButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    state.company = button.dataset.company;
-    companyButtons.forEach((item) => item.classList.toggle("selected", item === button));
-  });
 });
 
 form.addEventListener("submit", async (event) => {
