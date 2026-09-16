@@ -4,7 +4,7 @@
   --surface: #fff8d9;
   --surface-2: #eaf2ff;
   --text: #07142f;
-  --muted: #415172;
+  --muted: #1e2d4a;
   --line: #0a48c4;
   --accent: #075dff;
   --accent-strong: #002f9e;
@@ -20,7 +20,7 @@ body.dark {
   --surface: #07130d;
   --surface-2: #0d2317;
   --text: #dbffe7;
-  --muted: #82b895;
+  --muted: #b2e5c4;
   --line: #1d7f45;
   --accent: #28f06a;
   --accent-strong: #99ffb6;
@@ -428,10 +428,60 @@ textarea {
 }
 
 .result-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.9fr);
+  display: flex;
+  flex-direction: column;
   gap: 12px;
-  align-items: start;
+}
+
+.best-match-card {
+  padding: 16px;
+  border: 3px solid var(--accent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  box-shadow: var(--shadow);
+}
+
+.best-match-card .evidence-head {
+  font-size: 1.05rem;
+}
+
+.best-match-card .evidence-head span {
+  font-size: 1.2rem;
+}
+
+.best-match-card p {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.best-match-label {
+  display: inline-block;
+  margin-bottom: 8px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.other-recs h3 {
+  font-size: 0.88rem;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.other-recs .evidence-item {
+  padding: 8px 10px;
+}
+
+.other-recs .evidence-item p {
+  font-size: 0.8rem;
 }
 
 .result-card,
@@ -545,6 +595,6 @@ textarea {
   }
 
   .result-layout {
-    grid-template-columns: 1fr;
+    flex-direction: column;
   }
 }

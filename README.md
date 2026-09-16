@@ -1,6 +1,6 @@
-# HackerRank NLP Support Triage Lab
+# The Routing Room
 
-Local web software for explainable HackerRank support-ticket triage. The project started as a CLI hackathon submission; it is now a single-domain, UI-first NLP lab app.
+Explainable, multi-domain support-ticket routing system for HackerRank. The project started as a CLI hackathon submission; it is now a single-domain, UI-first NLP lab app.
 
 ## What It Does
 

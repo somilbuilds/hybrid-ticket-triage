@@ -93,23 +93,44 @@ async function loadDataset() {
   }
 }
 
-function renderRecommendations(recommendations) {
+function renderBestMatch(recommendations) {
   if (!recommendations || recommendations.length === 0) {
     return `<p class="response-box">No reliable support resource crossed the recommendation threshold.</p>`;
   }
+  const item = recommendations[0];
   return `
-    <div class="evidence-list">
-      ${recommendations.slice(0, 3).map((item) => `
-        <div class="evidence-item">
-          <div class="evidence-head">
-            <strong>#${item.rank} ${escapeHtml(item.title)}</strong>
-            <span>${Number(item.score || 0).toFixed(3)}</span>
+    <div class="best-match-card">
+      <span class="best-match-label">Best Match</span>
+      <div class="evidence-head">
+        <strong>${escapeHtml(item.title)}</strong>
+        <span>${Number(item.score || 0).toFixed(3)}</span>
+      </div>
+      <p>${escapeHtml(compact(item.source_path, 100))}</p>
+      <p>L ${Number(item.lexical_score || 0).toFixed(2)} / S ${Number(item.semantic_score || 0).toFixed(2)} / R ${Number(item.rerank_score || 0).toFixed(2)}</p>
+      <p>${escapeHtml(compact(item.match_explanation, 160))}</p>
+    </div>
+  `;
+}
+
+function renderOtherRecs(recommendations) {
+  if (!recommendations || recommendations.length <= 1) return "";
+  const others = recommendations.slice(1, 3);
+  return `
+    <div class="other-recs">
+      <h3>Other Recommendations</h3>
+      <div class="evidence-list">
+        ${others.map((item) => `
+          <div class="evidence-item">
+            <div class="evidence-head">
+              <strong>#${item.rank} ${escapeHtml(item.title)}</strong>
+              <span>${Number(item.score || 0).toFixed(3)}</span>
+            </div>
+            <p>${escapeHtml(compact(item.source_path, 74))}</p>
+            <p>L ${Number(item.lexical_score || 0).toFixed(2)} / S ${Number(item.semantic_score || 0).toFixed(2)} / R ${Number(item.rerank_score || 0).toFixed(2)}</p>
+            <p>${escapeHtml(compact(item.match_explanation, 130))}</p>
           </div>
-          <p>${escapeHtml(compact(item.source_path, 74))}</p>
-          <p>L ${Number(item.lexical_score || 0).toFixed(2)} / S ${Number(item.semantic_score || 0).toFixed(2)} / R ${Number(item.rerank_score || 0).toFixed(2)}</p>
-          <p>${escapeHtml(compact(item.match_explanation, 130))}</p>
-        </div>
-      `).join("")}
+        `).join("")}
+      </div>
     </div>
   `;
 }
@@ -166,18 +187,16 @@ function renderResult(data) {
       <div class="kv"><span>Resources</span><strong>${analysis.evidence_count}</strong></div>
     </div>
     <div class="result-layout">
+      ${renderBestMatch(data.recommendations)}
       <section class="result-card answer-card">
         <h3>Source Response</h3>
         <p>${escapeHtml(prediction.response)}</p>
-      </section>
-      <section class="result-card">
-        <h3>Recommended Resources</h3>
-        ${renderRecommendations(data.recommendations)}
       </section>
       ${renderAiSummary(data.ai_summary)}
       <section class="result-card trace-card">
         ${renderTrace(trace)}
       </section>
+      ${renderOtherRecs(data.recommendations)}
     </div>
   `;
 }
