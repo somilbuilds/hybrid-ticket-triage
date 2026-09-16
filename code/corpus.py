@@ -249,11 +249,9 @@ class CorpusIndex:
             semantic = float(semantic_scores[doc_index]) if semantic_scores is not None else 0.0
             semantic = max(0.0, semantic)
             lexical_norm = lexical_score / max_lexical
-            intent_boost = self._intent_boost(q_tokens, doc)
             final_score = (
                 (self._alpha * lexical_norm)
                 + ((1.0 - self._alpha) * semantic)
-                + intent_boost
             )
             if final_score <= 0:
                 continue
@@ -264,7 +262,6 @@ class CorpusIndex:
                     "lexical_score": lexical_score,
                     "lexical_norm": lexical_norm,
                     "semantic_score": semantic,
-                    "intent_boost": intent_boost,
                     "final_score": final_score,
                     "rerank_score": 0.0,
                 }
@@ -282,8 +279,7 @@ class CorpusIndex:
             rerank_scores = reranker.predict(pairs)
             for item, rerank_score in zip(pool, rerank_scores):
                 item["rerank_score"] = float(rerank_score)
-                item["rank_score"] = self._blend_rerank_score(item)
-            pool.sort(key=lambda item: item["rank_score"], reverse=True)
+            pool.sort(key=lambda item: item["rerank_score"], reverse=True)
 
         return [self._to_chunk(item, q_tokens) for item in pool[:top_k]]
 
@@ -294,23 +290,6 @@ class CorpusIndex:
                 continue
             indexes.append(index)
         return indexes
-
-    @staticmethod
-    def _intent_boost(query_tokens: list[str], doc: dict[str, Any]) -> float:
-        signal = f"{doc['title']} {doc['source_path']}".lower()
-        important = [
-            token
-            for token in query_tokens
-            if token not in STOPWORDS and len(token) > 3 and token in signal
-        ]
-        return min(0.12, 0.03 * len(set(important)))
-
-    @staticmethod
-    def _blend_rerank_score(item: dict[str, Any]) -> float:
-        rerank = float(item.get("rerank_score", 0.0))
-        # Cross-encoder scores are unbounded, so squash them before blending.
-        rerank_norm = 1.0 / (1.0 + math.exp(-rerank))
-        return (0.70 * rerank_norm) + (0.30 * float(item.get("final_score", 0.0)))
 
     def _lexical_candidates(
         self,
@@ -381,8 +360,7 @@ class CorpusIndex:
         lexical = float(item.get("lexical_norm", item.get("lexical_score", 0.0)))
         semantic = float(item.get("semantic_score", 0.0))
         rerank = float(item.get("rerank_score", 0.0))
-        intent_boost = float(item.get("intent_boost", 0.0))
-        explanation = self._explain_match(matched, lexical, semantic, rerank, intent_boost)
+        explanation = self._explain_match(matched, lexical, semantic, rerank)
         return EvidenceChunk(
             company=doc["company"],
             source_path=doc["source_path"],
@@ -402,16 +380,14 @@ class CorpusIndex:
         lexical_score: float,
         semantic_score: float,
         rerank_score: float,
-        intent_boost: float,
     ) -> str:
         keyword_text = ", ".join(matched_keywords[:4]) if matched_keywords else "semantic similarity"
-        boost_text = f" with title/path intent boost={intent_boost:.2f}" if intent_boost else ""
         if rerank_score:
             return (
                 f"Ranked highly after cross-encoder reranking; matched {keyword_text} "
-                f"with lexical={lexical_score:.2f} and semantic={semantic_score:.2f}{boost_text}."
+                f"with lexical={lexical_score:.2f} and semantic={semantic_score:.2f}."
             )
         return (
             f"Ranked by hybrid retrieval; matched {keyword_text} "
-            f"with lexical={lexical_score:.2f} and semantic={semantic_score:.2f}{boost_text}."
+            f"with lexical={lexical_score:.2f} and semantic={semantic_score:.2f}."
         )
