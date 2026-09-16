@@ -22,7 +22,7 @@ function showView(id) {
 
 function setTheme(theme) {
   document.body.classList.toggle("dark", theme === "dark");
-  themeIcon.textContent = theme === "dark" ? "D" : "L";
+  themeIcon.textContent = theme === "dark" ? "G" : "B";
   localStorage.setItem("theme", theme);
 }
 
@@ -101,16 +101,13 @@ function renderRecommendations(recommendations) {
     <div class="evidence-list">
       ${recommendations.slice(0, 3).map((item) => `
         <div class="evidence-item">
-          <strong>#${item.rank} ${escapeHtml(item.title)}</strong>
-          <p>${escapeHtml(item.source_path)}</p>
-          <p>
-            final ${Number(item.score || 0).toFixed(3)}
-            | lexical ${Number(item.lexical_score || 0).toFixed(3)}
-            | semantic ${Number(item.semantic_score || 0).toFixed(3)}
-            | rerank ${Number(item.rerank_score || 0).toFixed(3)}
-          </p>
-          <p>${escapeHtml(item.match_explanation)}</p>
-          <p>Matched keywords: ${escapeHtml((item.matched_keywords || []).join(", ") || "semantic similarity")}</p>
+          <div class="evidence-head">
+            <strong>#${item.rank} ${escapeHtml(item.title)}</strong>
+            <span>${Number(item.score || 0).toFixed(3)}</span>
+          </div>
+          <p>${escapeHtml(compact(item.source_path, 74))}</p>
+          <p>L ${Number(item.lexical_score || 0).toFixed(2)} / S ${Number(item.semantic_score || 0).toFixed(2)} / R ${Number(item.rerank_score || 0).toFixed(2)}</p>
+          <p>${escapeHtml(compact(item.match_explanation, 130))}</p>
         </div>
       `).join("")}
     </div>
@@ -126,15 +123,15 @@ function renderTrace(trace) {
   return `
     <div class="trace-box">
       <h3>Decision Trace</h3>
-      <div class="result-grid compact-grid">
+      <div class="result-grid trace-grid">
         <div class="kv"><span>Rule Type</span><strong>${escapeHtml(titleCase(trace.request_type_rule))}</strong></div>
         <div class="kv"><span>Area Model</span><strong>${escapeHtml(titleCase(trace.product_area))}</strong></div>
         <div class="kv"><span>Area Prob.</span><strong>${Number(trace.area_probability || 0).toFixed(3)}</strong></div>
         <div class="kv"><span>Ambiguity Gap</span><strong>${trace.ambiguity_gap === null || trace.ambiguity_gap === undefined ? "n/a" : Number(trace.ambiguity_gap).toFixed(3)}</strong></div>
       </div>
-      ${top ? `<p>Top resource: <strong>${escapeHtml(top.title)}</strong> (${escapeHtml(top.path)})</p>` : ""}
-      <p>Top lexical contributions: ${tokens || "semantic/reranker match"}</p>
-      <p>Routing reason: ${escapeHtml(trace.routing_reason)}</p>
+      ${top ? `<p><strong>${escapeHtml(top.title)}</strong></p>` : ""}
+      <p>Tokens: ${tokens || "semantic/reranker match"}</p>
+      <p>Reason: ${escapeHtml(trace.routing_reason)}</p>
     </div>
   `;
 }
@@ -155,23 +152,33 @@ function renderResult(data) {
   const trace = analysis.decision_trace;
   resultPanel.classList.remove("empty");
   resultPanel.innerHTML = `
-    <p class="eyebrow">Recommendation output</p>
-    <h3>${pill(prediction.status)} ${titleCase(prediction.product_area)}</h3>
-    <div class="result-grid">
-      <div class="kv"><span>Company</span><strong>${escapeHtml(titleCase(analysis.company))}</strong></div>
-      <div class="kv"><span>Request Type</span><strong>${escapeHtml(titleCase(prediction.request_type))}</strong></div>
-      <div class="kv"><span>Confidence</span><strong>${escapeHtml(titleCase(analysis.confidence))}</strong></div>
-      <div class="kv"><span>Top Score</span><strong>${Number(analysis.top_score || 0).toFixed(3)}</strong></div>
-      <div class="kv"><span>Area Confidence</span><strong>${escapeHtml(titleCase(analysis.area_confidence))}</strong></div>
-      <div class="kv"><span>Resource Count</span><strong>${analysis.evidence_count}</strong></div>
+    <div class="result-hero">
+      <div>
+        <p class="eyebrow">Recommendation output</p>
+        <h3>${pill(prediction.status)} ${titleCase(prediction.product_area)}</h3>
+      </div>
+      <strong>${Number(analysis.top_score || 0).toFixed(3)}</strong>
     </div>
-    <div class="response-box">${escapeHtml(prediction.justification)}</div>
-    <h3 style="margin-top: 18px;">Extractive Source Response</h3>
-    <div class="response-box">${escapeHtml(prediction.response)}</div>
-    ${renderAiSummary(data.ai_summary)}
-    <h3 style="margin-top: 18px;">Recommended Resources</h3>
-    ${renderRecommendations(data.recommendations)}
-    ${renderTrace(trace)}
+    <div class="result-grid">
+      <div class="kv"><span>Type</span><strong>${escapeHtml(titleCase(prediction.request_type))}</strong></div>
+      <div class="kv"><span>Confidence</span><strong>${escapeHtml(titleCase(analysis.confidence))}</strong></div>
+      <div class="kv"><span>Area Prob.</span><strong>${escapeHtml(titleCase(analysis.area_confidence))}</strong></div>
+      <div class="kv"><span>Resources</span><strong>${analysis.evidence_count}</strong></div>
+    </div>
+    <div class="result-layout">
+      <section class="result-card answer-card">
+        <h3>Source Response</h3>
+        <p>${escapeHtml(prediction.response)}</p>
+      </section>
+      <section class="result-card">
+        <h3>Recommended Resources</h3>
+        ${renderRecommendations(data.recommendations)}
+      </section>
+      ${renderAiSummary(data.ai_summary)}
+      <section class="result-card trace-card">
+        ${renderTrace(trace)}
+      </section>
+    </div>
   `;
 }
 
