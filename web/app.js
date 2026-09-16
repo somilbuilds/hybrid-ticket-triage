@@ -168,10 +168,10 @@ function renderResult(data) {
     <div class="response-box">${escapeHtml(prediction.justification)}</div>
     <h3 style="margin-top: 18px;">Extractive Source Response</h3>
     <div class="response-box">${escapeHtml(prediction.response)}</div>
+    ${renderAiSummary(data.ai_summary)}
     <h3 style="margin-top: 18px;">Recommended Resources</h3>
     ${renderRecommendations(data.recommendations)}
     ${renderTrace(trace)}
-    ${renderAiSummary(data.ai_summary)}
   `;
 }
 
