@@ -3,6 +3,7 @@ joblib
 lime
 matplotlib
 numpy
+openai
 scikit-learn
 sentence-transformers
 uvicorn[standard]

@@ -48,6 +48,7 @@ Complete the migration from a hackathon CLI triage agent into a single-domain Ha
 ## Cleanup Policy
 
 - Do not restore old hackathon `AGENTS.md`, logging workflows, or onboarding files.
-- Do not add Gemini/Groq/LLM polish paths.
 - Do not mutate original CSV datasets when users submit web tickets.
 - Keep pretrained model caches out of git; commit source code, docs, eval scripts/results, archived corpus moves, and the small persisted classifier.
+
+Groq (`openai/gpt-oss-120b`) is used as an optional, strictly additive response-polish layer -- see `code/llm_polish.py`. It never influences retrieval, classification, or escalation decisions.

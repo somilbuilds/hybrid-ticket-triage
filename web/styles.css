@@ -405,7 +405,7 @@ textarea {
 .trace-box {
   margin-top: 18px;
   padding-top: 16px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--line);
 }
 
 .trace-box p {
@@ -416,6 +416,20 @@ textarea {
 
 .compact-grid {
   grid-template-columns: repeat(4, minmax(120px, 1fr));
+}
+
+.ai-summary {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+}
+
+.ai-summary p {
+  margin-top: 10px;
+  color: var(--muted);
+  line-height: 1.6;
 }
 
 .evidence-list {

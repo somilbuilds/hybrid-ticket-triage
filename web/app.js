@@ -139,6 +139,16 @@ function renderTrace(trace) {
   `;
 }
 
+function renderAiSummary(summary) {
+  if (!summary) return "";
+  return `
+    <div class="ai-summary">
+      <h3>AI Summary (Groq)</h3>
+      <p>${escapeHtml(summary)}</p>
+    </div>
+  `;
+}
+
 function renderResult(data) {
   const prediction = data.prediction;
   const analysis = data.analysis;
@@ -161,6 +171,7 @@ function renderResult(data) {
     <h3 style="margin-top: 18px;">Recommended Resources</h3>
     ${renderRecommendations(data.recommendations)}
     ${renderTrace(trace)}
+    ${renderAiSummary(data.ai_summary)}
   `;
 }
 

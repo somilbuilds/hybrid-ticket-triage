@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import sys
+from dataclasses import replace
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,7 @@ if str(CODE_DIR) not in sys.path:
 
 from agent import SupportTriageAgent  # noqa: E402
 from corpus import CorpusIndex  # noqa: E402
+from llm_polish import polish_response  # noqa: E402
 
 load_dotenv(ROOT / ".env")
 
@@ -148,4 +150,13 @@ def triage(payload: TriageRequest) -> dict[str, Any]:
         "Subject": payload.subject,
         "Issue": payload.issue,
     }
-    return get_agent().predict_details(row).to_api()
+    details = get_agent().predict_details(row)
+    ai_summary = polish_response(
+        ticket=details.ticket,
+        prediction=details.prediction,
+        decision_trace=details.decision_trace,
+        evidence=details.evidence,
+    )
+    if ai_summary:
+        details = replace(details, ai_summary=ai_summary)
+    return details.to_api()

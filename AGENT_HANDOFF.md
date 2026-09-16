@@ -8,9 +8,10 @@ The user wants the old CLI hackathon support-triage project turned into a polish
 
 - Old hackathon `AGENTS.md` behavior.
 - Logging/onboarding workflows.
-- Gemini, Groq, or other LLM prose-polish response generation.
 - Claude/Visa as active runtime domains.
 - Writes to the original ticket CSVs from the web UI.
+
+Groq (`openai/gpt-oss-120b`) is used as an optional, strictly additive response-polish layer -- see `code/llm_polish.py`. It never influences retrieval, classification, or escalation decisions.
 
 ## Current System
 
@@ -22,6 +23,7 @@ The user wants the old CLI hackathon support-triage project turned into a polish
 - Hybrid retriever: `code/corpus.py`.
 - Product-area model loader: `code/area_model.py`.
 - Decision/extractive explanation helpers: `code/explain.py`.
+- Optional Groq polish layer: `code/llm_polish.py`, enabled only when `GROQ_API_KEY` is set.
 - Routing rules: `code/router.py`.
 - Dataclasses/API serialization: `code/models.py`.
 

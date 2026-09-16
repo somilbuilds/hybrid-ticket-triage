@@ -61,10 +61,12 @@ class TriageDetails:
     area_confidence: str
     escalation_reason: str
     decision_trace: dict = field(default_factory=dict)
+    ai_summary: str | None = None
 
     def to_api(self) -> dict:
         scores = [chunk.score for chunk in self.evidence]
         return {
+            "ai_summary": self.ai_summary,
             "ticket": {
                 "subject": self.ticket.subject,
                 "issue": self.ticket.issue,

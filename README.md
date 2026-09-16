@@ -12,6 +12,7 @@ Local web software for explainable HackerRank support-ticket triage. The project
 - Produces an extractive source response from the top support article; it does not generate fake LLM prose.
 - Classifies request type and product area, then decides `replied` vs `escalated`.
 - Shows decision trace details in the browser: confidence, routing reason, score gap, area probability, and lexical token attribution.
+- Optionally shows an AI Summary (Groq) when `GROQ_API_KEY` is configured; this is polish only and does not affect retrieval, classification, scores, or escalation.
 - Stores manually submitted ticket history only in browser local storage. Original CSV files are not modified.
 
 ## Run
@@ -28,6 +29,21 @@ http://127.0.0.1:8000
 ```
 
 The first run may download pretrained `sentence-transformers` models. Corpus embeddings are cached in `data/.cache/`, so server restarts do not rebuild embeddings unless the corpus changes.
+
+Optional Groq polish:
+
+```bash
+GROQ_API_KEY=your_key_here uvicorn app:app --reload
+```
+
+On Windows PowerShell:
+
+```powershell
+$env:GROQ_API_KEY="your_key_here"
+uvicorn app:app --reload
+```
+
+You can also put `GROQ_API_KEY=your_key_here` in a local `.env` file. Do not commit that file.
 
 ## Web Views
 
@@ -48,6 +64,7 @@ ticket subject + issue
   -> cross-encoder rerank over top fused candidates
   -> escalation rules: low score, ambiguity, risk terms, privileged/manual actions
   -> top-3 resource recommendations + extractive source response
+  -> optional Groq polish summary after the final decision is complete
 ```
 
 No fine-tuning is used. The persisted `models/area_clf.joblib` is a lightweight scikit-learn product-area classifier built from local corpus labels for the lab demo.
@@ -81,6 +98,7 @@ For a full retrieval sweep, omit `--limit`; it is slower because each query may 
 - `code/corpus.py`: hybrid retrieval and cached embeddings.
 - `code/router.py`: escalation rules.
 - `code/explain.py`: extractive response and decision trace helpers.
+- `code/llm_polish.py`: optional Groq summary layer, enabled by `GROQ_API_KEY`.
 - `code/area_model.py`: runtime product-area classifier loader.
 - `models/area_clf.joblib`: persisted product-area classifier.
 - `data/hackerrank/`: active support corpus.
