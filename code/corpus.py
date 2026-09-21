@@ -203,27 +203,39 @@ class CorpusIndex:
             "version": CACHE_VERSION,
             "model": EMBEDDING_MODEL,
             "heldout": self._heldout_text_by_path,
-            "docs": [
-                [doc["source_path"], doc["size"]]
-                for doc in self._docs
-            ],
+            "docs": sorted(doc["source_path"] for doc in self._docs),
         }
         raw = json.dumps(payload, sort_keys=True).encode("utf-8")
         return hashlib.sha256(raw).hexdigest()[:16]
 
     def _load_or_build_embeddings(self):
+        import logging
+        logger = logging.getLogger("routing-room")
         import numpy as np
 
         self._cache_dir.mkdir(parents=True, exist_ok=True)
         signature = self._corpus_signature()
         cache_path = self._cache_dir / f"embeddings-{signature}.npz"
+
+        logger.info("Embeddings cache check: signature=%s  path=%s  exists=%s",
+                     signature, cache_path, cache_path.exists())
+
+        # List what's actually in the cache dir for debugging
+        try:
+            cached_files = list(self._cache_dir.iterdir())
+            logger.info("Cache dir contents: %s", [f.name for f in cached_files])
+        except Exception:
+            logger.info("Cache dir listing failed")
+
         if cache_path.exists():
+            logger.info("CACHE HIT – loading precomputed embeddings from disk")
             return np.load(cache_path)["embeddings"]
 
+        logger.warning("CACHE MISS – must rebuild embeddings (this loads SentenceTransformer and will use ~300MB RAM)")
         from sentence_transformers import SentenceTransformer
 
-
         self._embedder = SentenceTransformer(EMBEDDING_MODEL, device="cpu")
+        logger.info("SentenceTransformer loaded. Encoding %d documents…", len(self._docs))
         texts = [
             f"{doc['index_title']}\n{doc['index_content'][:1800]}"
             for doc in self._docs
@@ -236,6 +248,7 @@ class CorpusIndex:
             show_progress_bar=False,
         )
         np.savez_compressed(cache_path, embeddings=embeddings)
+        logger.info("Embeddings cached to %s", cache_path)
         return embeddings
 
     def _embedding_model(self):

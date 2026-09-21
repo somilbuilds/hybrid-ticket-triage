@@ -1,22 +1,31 @@
 from __future__ import annotations
 
+# ── Memory-safety: set BEFORE any library import ──────────────────────
+import os
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 import csv
+import logging
 import sys
 from dataclasses import replace
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-import logging
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(name)s %(levelname)s %(message)s",
+)
 logger = logging.getLogger("routing-room")
-logger.info("Application starting up...")
 
 ROOT = Path(__file__).resolve().parent
 CODE_DIR = ROOT / "code"
@@ -24,7 +33,6 @@ if str(CODE_DIR) not in sys.path:
     sys.path.insert(0, str(CODE_DIR))
 
 from agent import SupportTriageAgent  # noqa: E402
-from corpus import CorpusIndex  # noqa: E402
 from llm_polish import polish_response  # noqa: E402
 
 load_dotenv(ROOT / ".env")
@@ -36,6 +44,8 @@ TICKET_CANDIDATES = [
     ROOT / "support_tickets_github" / "support_tickets.csv",
 ]
 WEB_DIR = ROOT / "web"
+
+logger.info("Module loaded.  DATA_DIR=%s  WEB_DIR=%s", DATA_DIR, WEB_DIR)
 
 
 class TriageRequest(BaseModel):
@@ -50,7 +60,10 @@ app.mount("/static", StaticFiles(directory=WEB_DIR), name="static")
 
 @lru_cache(maxsize=1)
 def get_agent() -> SupportTriageAgent:
-    return SupportTriageAgent(data_dir=DATA_DIR, top_k=3, alpha=0.4)
+    logger.info("get_agent() → creating SupportTriageAgent …")
+    agent = SupportTriageAgent(data_dir=DATA_DIR, top_k=3, alpha=0.4)
+    logger.info("get_agent() → agent ready.")
+    return agent
 
 
 def ticket_csv_path() -> Path:
@@ -83,6 +96,8 @@ def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+# ── Routes ────────────────────────────────────────────────────────────
+
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(WEB_DIR / "index.html")
@@ -96,10 +111,6 @@ def health() -> dict[str, Any]:
         "ticket_csv": str(ticket_csv_path()),
     }
 
-
-import os
-os.environ["OMP_NUM_THREADS"] = "1"
-os.environ["MKL_NUM_THREADS"] = "1"
 
 @app.get("/api/corpus-stats")
 def corpus_stats() -> dict[str, Any]:
@@ -118,35 +129,34 @@ def corpus_stats() -> dict[str, Any]:
 @app.get("/api/dataset")
 def dataset(limit: int = 200) -> dict[str, Any]:
     import json
+
     precomputed_path = DATA_DIR / "precomputed_dataset.json"
     try:
         with precomputed_path.open("r", encoding="utf-8") as f:
             data = json.load(f)
-        
-        # Apply the limit to the rows
         limit = max(1, min(limit, 500))
         data["rows"] = data["rows"][:limit]
         return data
     except FileNotFoundError as exc:
         raise HTTPException(
-            status_code=404, 
-            detail="Precomputed dataset not found. Please ensure the dataset is generated."
+            status_code=404,
+            detail="Precomputed dataset not found.",
         ) from exc
 
 
 @app.post("/api/triage")
 def triage(payload: TriageRequest) -> dict[str, Any]:
-    logger.info(f"POST /api/triage started for subject: {payload.subject}")
+    logger.info("POST /api/triage  subject=%s", payload.subject)
     row = {
         "Company": payload.company,
         "Subject": payload.subject,
         "Issue": payload.issue,
     }
-    logger.info("Calling get_agent()")
+    logger.info("  → get_agent()")
     agent = get_agent()
-    logger.info("Agent retrieved. Calling predict_details().")
+    logger.info("  → predict_details()")
     details = agent.predict_details(row)
-    logger.info("Prediction successful. Calling polish_response().")
+    logger.info("  → polish_response()")
     ai_summary = polish_response(
         ticket=details.ticket,
         prediction=details.prediction,
@@ -155,5 +165,5 @@ def triage(payload: TriageRequest) -> dict[str, Any]:
     )
     if ai_summary:
         details = replace(details, ai_summary=ai_summary)
-    logger.info("Finished triage request.")
+    logger.info("  ✓ triage complete")
     return details.to_api()
