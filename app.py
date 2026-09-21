@@ -7,11 +7,16 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+import logging
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logger = logging.getLogger("routing-room")
+logger.info("Application starting up...")
 
 ROOT = Path(__file__).resolve().parent
 CODE_DIR = ROOT / "code"
@@ -131,12 +136,17 @@ def dataset(limit: int = 200) -> dict[str, Any]:
 
 @app.post("/api/triage")
 def triage(payload: TriageRequest) -> dict[str, Any]:
+    logger.info(f"POST /api/triage started for subject: {payload.subject}")
     row = {
         "Company": payload.company,
         "Subject": payload.subject,
         "Issue": payload.issue,
     }
-    details = get_agent().predict_details(row)
+    logger.info("Calling get_agent()")
+    agent = get_agent()
+    logger.info("Agent retrieved. Calling predict_details().")
+    details = agent.predict_details(row)
+    logger.info("Prediction successful. Calling polish_response().")
     ai_summary = polish_response(
         ticket=details.ticket,
         prediction=details.prediction,
@@ -145,4 +155,5 @@ def triage(payload: TriageRequest) -> dict[str, Any]:
     )
     if ai_summary:
         details = replace(details, ai_summary=ai_summary)
+    logger.info("Finished triage request.")
     return details.to_api()

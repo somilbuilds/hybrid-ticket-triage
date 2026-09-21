@@ -240,16 +240,24 @@ class CorpusIndex:
 
     def _embedding_model(self):
         if self._embedder is None:
+            import logging
+            logger = logging.getLogger("routing-room")
+            logger.info("Initializing SentenceTransformer for semantic_search...")
             from sentence_transformers import SentenceTransformer
 
             self._embedder = SentenceTransformer(EMBEDDING_MODEL, device="cpu")
+            logger.info("SentenceTransformer loaded successfully.")
         return self._embedder
 
     def _rerank_model(self):
         if self._reranker is None:
+            import logging
+            logger = logging.getLogger("routing-room")
+            logger.info("Initializing CrossEncoder for reranking...")
             from sentence_transformers import CrossEncoder
 
             self._reranker = CrossEncoder(RERANK_MODEL, device="cpu")
+            logger.info("CrossEncoder loaded successfully.")
         return self._reranker
 
     def lexical_search(self, query: str, top_k: int) -> list[EvidenceChunk]:

@@ -40,22 +40,33 @@ class SupportTriageAgent:
         return self.predict_details(row).prediction
 
     def predict_details(self, row: dict[str, str]) -> TriageDetails:
+        import logging
+        logger = logging.getLogger("routing-room")
+        logger.info("Initializing Agent predict_details...")
         ticket = Ticket(
             issue=self._pick(row, "issue", "Issue"),
             subject=self._pick(row, "subject", "Subject"),
             company="HackerRank",
         )
+        logger.info("Classifying request type...")
         request_type = classify_request_type(ticket)
+        logger.info(f"Classified request type as: {request_type}. Building queries...")
         queries = self._build_queries(ticket)
 
+        logger.info(f"Retrieving evidence for {len(queries)} queries...")
         evidence = self._retrieve_evidence(queries=queries)
+        logger.info(f"Retrieved {len(evidence)} evidence chunks.")
 
+        logger.info("Predicting Area...")
         product_area, area_probability = predict_area(ticket.combined_text)
         if area_probability <= 0:
+            logger.info("Inferring product_area from evidence due to low probability...")
             product_area, area_probability = infer_product_area_from_evidence(
                 evidence=evidence,
                 request_type=request_type,
             )
+        
+        logger.info("Assessing routing rules...")
         escalated, escalation_reason, confidence = assess_routing(
             ticket=ticket,
             request_type=request_type,
