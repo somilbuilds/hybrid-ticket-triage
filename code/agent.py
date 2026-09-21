@@ -16,7 +16,7 @@ from router import assess_routing
 
 class SupportTriageAgent:
     def __init__(self, data_dir: Path, top_k: int = 3, alpha: float = 0.4) -> None:
-        self._index = CorpusIndex(data_dir=data_dir, alpha=alpha, use_reranker=False)
+        self._index = CorpusIndex(data_dir=data_dir, alpha=alpha, use_embeddings=False, use_reranker=False)
         self._top_k = top_k
         self.last_run_interrupted = False
 

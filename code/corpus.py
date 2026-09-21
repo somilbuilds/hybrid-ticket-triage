@@ -85,7 +85,7 @@ class CorpusIndex:
         data_dir: Path,
         alpha: float = 0.4,
         cache_dir: Path | None = None,
-        use_embeddings: bool = True,
+        use_embeddings: bool = False,
         use_reranker: bool = False,
         heldout_text_by_path: dict[str, list[str]] | None = None,
     ) -> None:
@@ -231,12 +231,6 @@ class CorpusIndex:
         if cache_path.exists():
             logger.info("CACHE HIT – loading precomputed embeddings from disk")
             embeddings = np.load(cache_path)["embeddings"]
-            gc.collect()
-            # Eagerly load the SentenceTransformer now (while memory is clean)
-            # so query-time encoding doesn't OOM on constrained instances.
-            logger.info("Eagerly loading SentenceTransformer for query encoding…")
-            self._embedder = self._make_embedder()
-            logger.info("SentenceTransformer ready.")
             gc.collect()
             return embeddings
 
