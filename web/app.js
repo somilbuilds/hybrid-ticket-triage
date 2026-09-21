@@ -60,7 +60,7 @@ function statCard(label, value, detail = "") {
 }
 
 async function loadDataset() {
-  datasetRows.innerHTML = `<tr><td colspan="7">Running hybrid retrieval over the dataset...</td></tr>`;
+  datasetRows.innerHTML = `<tr><td colspan="7">Loading existing ticket dataset...</td></tr>`;
   datasetStats.innerHTML = "";
   try {
     const response = await fetch("/api/dataset");

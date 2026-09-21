@@ -108,39 +108,21 @@ def corpus_stats() -> dict[str, Any]:
 
 @app.get("/api/dataset")
 def dataset(limit: int = 200) -> dict[str, Any]:
+    import json
+    precomputed_path = DATA_DIR / "precomputed_dataset.json"
     try:
-        rows = read_ticket_rows()
+        with precomputed_path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        
+        # Apply the limit to the rows
+        limit = max(1, min(limit, 500))
+        data["rows"] = data["rows"][:limit]
+        return data
     except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-    agent = get_agent()
-    enriched = []
-    for index, row in enumerate(rows[: max(1, min(limit, 500))], start=1):
-        details = agent.predict_details(row).to_api()
-        prediction = details["prediction"]
-        ticket = details["ticket"]
-        analysis = details["analysis"]
-        enriched.append(
-            {
-                "id": index,
-                "subject": ticket["subject"],
-                "issue": ticket["issue"],
-                "company": ticket["company"] or analysis["company"],
-                "status": prediction["status"],
-                "product_area": prediction["product_area"],
-                "request_type": prediction["request_type"],
-                "confidence": analysis["confidence"],
-                "top_score": analysis["top_score"],
-                "recommendations": details["recommendations"],
-                "justification": prediction["justification"],
-            }
-        )
-
-    return {
-        "source": str(ticket_csv_path()),
-        "rows": enriched,
-        "summary": summarize(enriched),
-    }
+        raise HTTPException(
+            status_code=404, 
+            detail="Precomputed dataset not found. Please ensure the dataset is generated."
+        ) from exc
 
 
 @app.post("/api/triage")

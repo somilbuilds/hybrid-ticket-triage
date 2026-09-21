@@ -4,7 +4,7 @@
   --surface: #fff8d9;
   --surface-2: #eaf2ff;
   --text: #07142f;
-  --muted: #1e2d4a;
+  --muted: #0d1a33;
   --line: #0a48c4;
   --accent: #075dff;
   --accent-strong: #002f9e;
@@ -20,7 +20,7 @@ body.dark {
   --surface: #07130d;
   --surface-2: #0d2317;
   --text: #dbffe7;
-  --muted: #b2e5c4;
+  --muted: #d5ffe4;
   --line: #1d7f45;
   --accent: #28f06a;
   --accent-strong: #99ffb6;
@@ -289,13 +289,15 @@ td {
 
 th {
   background: var(--surface-2);
-  font-size: 0.78rem;
+  color: var(--text);
+  font-weight: 800;
+  font-size: 0.85rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 td {
-  color: var(--muted);
+  color: var(--text);
 }
 
 .pill {
@@ -303,7 +305,7 @@ td {
   align-items: center;
   min-height: 26px;
   padding: 3px 10px;
-  border: 1px solid currentColor;
+  border: 2px solid currentColor;
   border-radius: 4px;
   font-size: 0.78rem;
   font-weight: 800;
@@ -311,12 +313,12 @@ td {
 }
 
 .pill.replied {
-  background: color-mix(in srgb, var(--good) 16%, transparent);
+  background: color-mix(in srgb, var(--good) 24%, transparent);
   color: var(--good);
 }
 
 .pill.escalated {
-  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  background: color-mix(in srgb, var(--danger) 24%, transparent);
   color: var(--danger);
 }
 
@@ -354,8 +356,8 @@ label {
   display: grid;
   gap: 8px;
   margin-bottom: 16px;
-  color: var(--muted);
-  font-weight: 750;
+  color: var(--text);
+  font-weight: 800;
 }
 
 input,
