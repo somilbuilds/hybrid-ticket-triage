@@ -213,13 +213,15 @@ class CorpusIndex:
 
     def _load_or_build_embeddings(self):
         import numpy as np
-        from sentence_transformers import SentenceTransformer
 
         self._cache_dir.mkdir(parents=True, exist_ok=True)
         signature = self._corpus_signature()
         cache_path = self._cache_dir / f"embeddings-{signature}.npz"
         if cache_path.exists():
             return np.load(cache_path)["embeddings"]
+
+        from sentence_transformers import SentenceTransformer
+
 
         self._embedder = SentenceTransformer(EMBEDDING_MODEL, device="cpu")
         texts = [

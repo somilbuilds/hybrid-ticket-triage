@@ -92,9 +92,13 @@ def health() -> dict[str, Any]:
     }
 
 
+import os
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+
 @app.get("/api/corpus-stats")
 def corpus_stats() -> dict[str, Any]:
-    index = CorpusIndex(DATA_DIR, use_embeddings=False, use_reranker=False)
+    index = get_agent()._index
     by_area: dict[str, int] = {}
     for doc in index.documents:
         area = str(doc.get("product_area") or "unknown")
