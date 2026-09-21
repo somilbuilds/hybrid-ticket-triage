@@ -10,6 +10,7 @@ before indexing; otherwise title-query evaluation would collapse into exact
 string lookup.
 """
 
+import gc
 import hashlib
 import json
 import math
@@ -85,7 +86,7 @@ class CorpusIndex:
         alpha: float = 0.4,
         cache_dir: Path | None = None,
         use_embeddings: bool = True,
-        use_reranker: bool = True,
+        use_reranker: bool = False,
         heldout_text_by_path: dict[str, list[str]] | None = None,
     ) -> None:
         self._alpha = min(max(alpha, 0.0), 1.0)
@@ -229,7 +230,15 @@ class CorpusIndex:
 
         if cache_path.exists():
             logger.info("CACHE HIT – loading precomputed embeddings from disk")
-            return np.load(cache_path)["embeddings"]
+            embeddings = np.load(cache_path)["embeddings"]
+            gc.collect()
+            # Eagerly load the SentenceTransformer now (while memory is clean)
+            # so query-time encoding doesn't OOM on constrained instances.
+            logger.info("Eagerly loading SentenceTransformer for query encoding…")
+            self._embedder = self._make_embedder()
+            logger.info("SentenceTransformer ready.")
+            gc.collect()
+            return embeddings
 
         logger.warning("CACHE MISS – must rebuild embeddings (this loads SentenceTransformer and will use ~300MB RAM)")
         from sentence_transformers import SentenceTransformer
@@ -251,14 +260,17 @@ class CorpusIndex:
         logger.info("Embeddings cached to %s", cache_path)
         return embeddings
 
+    @staticmethod
+    def _make_embedder():
+        from sentence_transformers import SentenceTransformer
+        return SentenceTransformer(EMBEDDING_MODEL, device="cpu")
+
     def _embedding_model(self):
         if self._embedder is None:
             import logging
             logger = logging.getLogger("routing-room")
             logger.info("Initializing SentenceTransformer for semantic_search...")
-            from sentence_transformers import SentenceTransformer
-
-            self._embedder = SentenceTransformer(EMBEDDING_MODEL, device="cpu")
+            self._embedder = self._make_embedder()
             logger.info("SentenceTransformer loaded successfully.")
         return self._embedder
 
