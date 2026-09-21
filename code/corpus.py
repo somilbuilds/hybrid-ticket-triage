@@ -204,7 +204,7 @@ class CorpusIndex:
             "model": EMBEDDING_MODEL,
             "heldout": self._heldout_text_by_path,
             "docs": [
-                [doc["source_path"], doc["mtime_ns"], doc["size"]]
+                [doc["source_path"], doc["size"]]
                 for doc in self._docs
             ],
         }
