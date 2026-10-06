@@ -130,6 +130,7 @@ class CorpusIndex:
                 continue
 
             title = self._extract_title(md_path.stem, raw_text)
+            source_url = self._extract_source_url(raw_text)
             content = self._squash_whitespace(raw_text)
             source_path = str(rel).replace("\\", "/")
             index_title, index_content = self._apply_heldout_text(source_path, title, content)
@@ -146,6 +147,7 @@ class CorpusIndex:
                     "company": "hackerrank",
                     "product_area": product_area,
                     "source_path": source_path,
+                    "source_url": source_url,
                     "title": title,
                     "content": content,
                     "index_title": index_title,
@@ -172,6 +174,16 @@ class CorpusIndex:
 
         if self._use_embeddings:
             self._embeddings = self._load_or_build_embeddings()
+
+    @staticmethod
+    def _extract_source_url(text: str) -> str:
+        if not text.startswith("---"):
+            return ""
+        parts = text.split("---", 2)
+        if len(parts) != 3:
+            return ""
+        match = re.search(r"^source_url:\s*['\"]?([^'\"]+)['\"]?\s*$", parts[1], re.MULTILINE)
+        return match.group(1).strip() if match else ""
 
     @staticmethod
     def _extract_title(stem: str, text: str) -> str:
@@ -438,6 +450,7 @@ class CorpusIndex:
             company=doc["company"],
             product_area=doc["product_area"],
             source_path=doc["source_path"],
+            source_url=doc.get("source_url", ""),
             title=doc["title"],
             content=doc["content"][:900],
             score=score,
