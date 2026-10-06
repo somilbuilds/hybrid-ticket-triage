@@ -11,7 +11,8 @@ class Ticket:
 
     @property
     def combined_text(self) -> str:
-        return f"{self.subject}\n{self.issue}".strip()
+        return f"{self.subject}
+{self.issue}".strip()
 
 
 @dataclass(frozen=True)
@@ -19,6 +20,7 @@ class EvidenceChunk:
     company: str
     product_area: str
     source_path: str
+    source_url: str
     title: str
     content: str
     score: float
@@ -91,6 +93,7 @@ class TriageDetails:
                     "company": chunk.company,
                     "product_area": chunk.product_area,
                     "source_path": chunk.source_path,
+                    "source_url": chunk.source_url,
                     "title": chunk.title,
                     "content": chunk.content,
                     "score": round(chunk.score, 4),
