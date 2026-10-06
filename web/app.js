@@ -106,6 +106,7 @@ function renderBestMatch(recommendations) {
         <span>${Number(item.score || 0).toFixed(3)}</span>
       </div>
       <p>${escapeHtml(compact(item.source_path, 100))}</p>
+      ${item.source_url ? `<a class="resource-link" href="${escapeHtml(item.source_url)}" target="_blank" rel="noopener noreferrer">Open HackerRank article <span aria-hidden="true">↗</span></a>` : ""}
       <p>L ${Number(item.lexical_score || 0).toFixed(2)} / S ${Number(item.semantic_score || 0).toFixed(2)} / R ${Number(item.rerank_score || 0).toFixed(2)}</p>
       <p>${escapeHtml(compact(item.match_explanation, 160))}</p>
     </div>
@@ -126,6 +127,7 @@ function renderOtherRecs(recommendations) {
               <span>${Number(item.score || 0).toFixed(3)}</span>
             </div>
             <p>${escapeHtml(compact(item.source_path, 74))}</p>
+            ${item.source_url ? `<a class="resource-link" href="${escapeHtml(item.source_url)}" target="_blank" rel="noopener noreferrer">Open HackerRank article <span aria-hidden="true">↗</span></a>` : ""}
             <p>L ${Number(item.lexical_score || 0).toFixed(2)} / S ${Number(item.semantic_score || 0).toFixed(2)} / R ${Number(item.rerank_score || 0).toFixed(2)}</p>
             <p>${escapeHtml(compact(item.match_explanation, 130))}</p>
           </div>
