@@ -177,13 +177,23 @@ class CorpusIndex:
 
     @staticmethod
     def _extract_source_url(text: str) -> str:
+        # Frontmatter is the authoritative source for canonical article links.
+        # Be tolerant of a UTF-8 BOM and YAML whitespace/quoting variations.
+        text = text.lstrip("\ufeff")
         if not text.startswith("---"):
             return ""
         parts = text.split("---", 2)
         if len(parts) != 3:
             return ""
-        match = re.search(r"^source_url:\s*['\"]?([^'\"]+)['\"]?\s*$", parts[1], re.MULTILINE)
-        return match.group(1).strip() if match else ""
+        frontmatter = parts[1]
+        match = re.search(
+            r"^\\s*source_url\\s*:\\s*(?:[\\\"'])(.*?)(?:[\\\"'])\\s*$|^\\s*source_url\\s*:\\s*(https?://\\S+)\\s*$",
+            frontmatter,
+            re.MULTILINE,
+        )
+        if not match:
+            return ""
+        return (match.group(1) or match.group(2) or "").strip()
 
     @staticmethod
     def _extract_title(stem: str, text: str) -> str:
