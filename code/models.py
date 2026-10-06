@@ -11,8 +11,7 @@ class Ticket:
 
     @property
     def combined_text(self) -> str:
-        return f"{self.subject}
-{self.issue}".strip()
+        return f"{self.subject}\n{self.issue}".strip()
 
 
 @dataclass(frozen=True)
